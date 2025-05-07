@@ -8,6 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import json
 import os
 import sys
+import json
+import traceback
+from pathlib import Path
 import pandas as pd
 from openpyxl import load_workbook
 from pydantic import BaseModel
@@ -15,10 +18,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-import psutil
-import logging
+from contextlib import redirect_stdout, redirect_stderr
 
-logger = logging.getLogger(__name__)
+
 
 class SheetSelection(BaseModel):
     current_sheet: str
@@ -28,6 +30,9 @@ class SheetSelection(BaseModel):
 
 app = FastAPI()
 UPLOAD_DIR = "uploaded"
+
+LOG_FILE_PATH = Path("logs") / "process_operation.log"
+LOG_FILE_PATH.parent.mkdir(exist_ok=True)
 
 # Allow frontend JS to call backend APIs (if needed)
 app.add_middleware(
@@ -139,72 +144,84 @@ async def process_selected(selection: SheetSelection = None):
 @app.post("/process-operation/")
 async def process_operation():
     try:
-        logger.info(f"Memory usage: {psutil.virtual_memory().percent}% used")
-        # Load and prepare all data
-        dfs = load_and_prepare_all_data()
-        merged_df = merge_employee_data(dfs)
+        with open(LOG_FILE_PATH, "w", encoding="utf-8") as log_file:
+            with redirect_stdout(log_file), redirect_stderr(log_file):
+                print("[INFO] Process started.")
+                # Load and prepare all data
+                dfs = load_and_prepare_all_data()
+                merged_df = merge_employee_data(dfs)
 
-        # Export current_df to Excel
-        output_path = "output.xlsx"
-        current_df = global_context["current_df"]
+                # Export current_df to Excel
+                output_path = "output.xlsx"
+                current_df = global_context["current_df"]
 
-        # Read selected sheet name from selection.json
-        with open("uploaded/selection.json", "r") as f:
-            selection_data = json.load(f)
-        current_sheet_name = selection_data.get("current_sheet")
+                # Read selected sheet name from selection.json
+                with open("uploaded/selection.json", "r") as f:
+                    selection_data = json.load(f)
+                current_sheet_name = selection_data.get("current_sheet")
 
-        export_info = export_current_df_to_excel(current_df, current_sheet_name, output_path)
+                export_info = export_current_df_to_excel(current_df, current_sheet_name, output_path)
 
-        # Load Excel sheet again for mismatch checks
-        wb = load_workbook(output_path)
-        ws_main = wb[current_sheet_name]
+                # Load Excel sheet again for mismatch checks
+                wb = load_workbook(output_path)
+                ws_main = wb[current_sheet_name]
 
-        result = export_current_df_to_excel(current_df, current_sheet_name, output_path)
-        wb = result["wb"]                         # Use this instead of load_workbook()
-        ws_error = result["ws_error"]
-        ws_main = wb[current_sheet_name]         # This still works if `current_sheet_name` is valid
+                result = export_current_df_to_excel(current_df, current_sheet_name, output_path)
+                wb = result["wb"]                         # Use this instead of load_workbook()
+                ws_error = result["ws_error"]
+                ws_main = wb[current_sheet_name]         # This still works if `current_sheet_name` is valid
 
-        # Extract headers
-        headers = [str(cell.value).strip().lower().replace(" ", "") for cell in ws_main[1]]
+                # Extract headers
+                headers = [str(cell.value).strip().lower().replace(" ", "") for cell in ws_main[1]]
 
-        # Calculate ESI wages and detect mismatches
-        esi_wages_list, total_wages_error_rows = calculate_esi_eligibility(
-            current_df, merged_df, ws_main, headers
-        )
+                # Calculate ESI wages and detect mismatches
+                esi_wages_list, total_wages_error_rows = calculate_esi_eligibility(
+                    current_df, merged_df, ws_main, headers
+                )
 
-        # Processs Increment file with Added Increments
-        increment_df = process_increment_file(dfs)
+                # Processs Increment file with Added Increments
+                increment_df = process_increment_file(dfs)
 
-        # Calculate ESI wages
-        calculate_esi_wages(
-            wb=wb,
-            ws_main=ws_main,
-            ws_error=ws_error,
-            esi_wages_list=esi_wages_list,
-            previous_df=dfs["previous_file"],
-            master_df=dfs["master_file"],
-            increment_df=increment_df,
-            output_file=output_path
-        )
+                # Calculate ESI wages
+                calculate_esi_wages(
+                    wb=wb,
+                    ws_main=ws_main,
+                    ws_error=ws_error,
+                    esi_wages_list=esi_wages_list,
+                    previous_df=dfs["previous_file"],
+                    master_df=dfs["master_file"],
+                    increment_df=increment_df,
+                    output_file=output_path
+                )
 
-        calculate_pf_wages(
-            wb=wb,
-            ws_main=ws_main,
-            ws_error=ws_error,
-            previous_df=dfs["previous_file"],
-            master_df=dfs["master_file"],
-            increment_df=increment_df,
-            headers=headers,
-            merged_df=merged_df
-        )
+                calculate_pf_wages(
+                    wb=wb,
+                    ws_main=ws_main,
+                    ws_error=ws_error,
+                    previous_df=dfs["previous_file"],
+                    master_df=dfs["master_file"],
+                    increment_df=increment_df,
+                    headers=headers,
+                    merged_df=merged_df
+                )
 
-        wb.save(output_path)
-        print(f"✅ Final report saved as '{output_path}'")
+                wb.save(output_path)
+                print(f"✅ Final report saved as '{output_path}'")
 
         return get_output_excel_response()
 
     except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        error_msg = f"[ERROR] {e}\n{traceback.format_exc()}"
+        with open(LOG_FILE_PATH, "a", encoding="utf-8") as log_file:
+            log_file.write(error_msg)
+        return JSONResponse(content={"error": str(e)}, status_code=500)
+    
+@app.get("/get-latest-log/")
+async def get_latest_log():
+    if LOG_FILE_PATH.exists():
+        with open(LOG_FILE_PATH, "r", encoding="utf-8") as f:
+            return {"log": f.read()}
+    return {"log": "[No logs found]"}
 
 
 router = APIRouter()

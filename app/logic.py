@@ -13,6 +13,7 @@ from openpyxl.styles import Font
 import os
 from math import ceil
 from fastapi.responses import StreamingResponse
+from io import BytesIO
 
 
 # Function to delete all files in the uploaded directory
@@ -54,7 +55,12 @@ def extract_sheet_names(file_dict):
 
 def load_excel_with_dynamic_header(file_path, sheet_name, required_headers):
     print(f"[INFO] Loading file: {file_path} | Sheet: {sheet_name}")
-    temp_df = pd.read_excel(file_path, sheet_name=sheet_name, nrows=6, header=None)
+
+    # Read file content into memory and close immediately
+    with open(file_path, "rb") as f:
+        file_bytes = f.read()
+
+    temp_df = pd.read_excel(BytesIO(file_bytes), sheet_name=sheet_name, nrows=6, header=None)
     header_row_index = None
 
     for i in range(6):
@@ -67,7 +73,7 @@ def load_excel_with_dynamic_header(file_path, sheet_name, required_headers):
     if header_row_index is None:
         raise ValueError(f"[ERROR] Header with {required_headers} not found in first 6 rows of {file_path}")
 
-    df = pd.read_excel(file_path, sheet_name=sheet_name, header=header_row_index)
+    df = pd.read_excel(BytesIO(file_bytes), sheet_name=sheet_name, header=header_row_index)
     print(f"[INFO] Loaded {len(df)} rows from '{file_path}'\n")
     return df, header_row_index
 
