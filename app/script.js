@@ -134,7 +134,7 @@ function showSheetSelectionSection(data) {
 // Handle process-operation call
 document.getElementById("processOperationButton").addEventListener("click", async () => {
     const spinner = document.getElementById("loadingSpinner");
-    spinner.style.display = "inline-block"; // Show spinner during the operation
+    spinner.style.display = "inline-block"; // Show spinner
 
     try {
         const response = await fetch("/process-operation/", {
@@ -152,20 +152,17 @@ document.getElementById("processOperationButton").addEventListener("click", asyn
         downloadLink.href = downloadUrl;
         downloadLink.download = "final_output.xlsx";
         document.getElementById("resultSection").style.display = "block";
+        alert("Operation completed. Download the output file.");
 
-        // ✅ Fetch logs after successful execution
-        fetchLogs();
 
     } catch (error) {
         console.error("Error during process operation:", error);
         alert("Process operation failed.");
-
-        // ✅ Fetch logs after successful execution
-        fetchLogs();
     } finally {
-        spinner.style.display = "none"; // Hide spinner after operation
+        spinner.style.display = "none"; // Hide spinner regardless of outcome
     }
 });
+
 
 
 async function processSelectedSheets(data) {
@@ -212,15 +209,3 @@ async function processOperation() {
         console.error("Error processing operation:", error);
     }
 }
-
-function fetchLogs() {
-    fetch('/get-latest-log/')
-        .then(response => response.json())
-        .then(data => {
-            const terminal = document.getElementById('terminal');
-            terminal.textContent = data.log;
-            terminal.scrollTop = terminal.scrollHeight;
-        });
-}
-
-
