@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PML</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Employee Wage Verification Tool</h1>
+
+        <!-- File Upload Section -->
+        <div class="upload-section">
+            <h2>Upload Excel Files</h2>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <label for="masterFile">Master File:</label>
+                <input type="file" id="masterFile" name="masterFile" accept=".xls, .xlsx" required><br><br>
+
+                <label for="incrementFile">Increment File:</label>
+                <input type="file" id="incrementFile" name="incrementFile" accept=".xls, .xlsx" required><br><br>
+
+                <label for="currentFile">Current File:</label>
+                <input type="file" id="currentFile" name="currentFile" accept=".xls, .xlsx" required><br><br>
+
+                <label for="previousFile">Previous File:</label>
+                <input type="file" id="previousFile" name="previousFile" accept=".xls, .xlsx" required><br><br>
+
+                <button type="submit">Upload Files</button>
+            </form>
+        </div>
+
+
+        <!-- File Sheet Selection Section -->
+        <div id="sheetSelectionSection" class="sheet-selection-section" style="display: none;">
+            <h2>Select Sheets</h2>
+            <form id="sheetForm">
+                <!-- Dynamic dropdowns for sheet selection will be added here -->
+                <button type="submit">Process Selected Sheets</button><br><br>
+            </form><br><br>
+            <button type="button" id="processOperationButton" style="display: none;">Run Process Operation</button><span
+                id="loadingSpinner" style="display: none; margin-left: 10px;" class="spinner"></span>
+        </div>
+
+        <!-- Processing Result Section -->
+        <div id="resultSection" class="result-section" style="display: none;">
+            <h2>Processing Result</h2>
+            <a id="downloadLink" href="#" download>Download Final Output</a>
+        </div>
+
+        <!-- Terminal Style Div to Show Logs -->
+        <div id="terminal" style="background:#111;
+            color:#0f0;
+            padding:10px;
+            font-family:monospace;
+            height:300px;
+            overflow:auto;
+            white-space:pre-wrap;">Loading Logs...</div>
+
+
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+
+</html>
