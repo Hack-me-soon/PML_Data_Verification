@@ -19,8 +19,10 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from contextlib import redirect_stdout, redirect_stderr
+import psutil
+import logging
 
-
+logger = logging.getLogger(__name__)
 
 class SheetSelection(BaseModel):
     current_sheet: str
@@ -144,6 +146,7 @@ async def process_selected(selection: SheetSelection = None):
 @app.post("/process-operation/")
 async def process_operation():
     try:
+        logger.info(f"Memory usage: {psutil.virtual_memory().percent}% used")
         with open(LOG_FILE_PATH, "w", encoding="utf-8") as log_file:
             with redirect_stdout(log_file), redirect_stderr(log_file):
                 print("[INFO] Process started.")
